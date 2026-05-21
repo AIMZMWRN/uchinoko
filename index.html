@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>うちの子プロフィールカードメーカー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js" crossorigin="anonymous"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['LINE Seed JP', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+
+        .line-seed-jp-regular { font-family: "LINE Seed JP", sans-serif; font-weight: 400; }
+        .line-seed-jp-medium { font-family: "LINE Seed JP", sans-serif; font-weight: 400; }
+        .line-seed-jp-bold { font-family: "LINE Seed JP", sans-serif; font-weight: 700; }
+        .line-seed-jp-black { font-family: "LINE Seed JP", sans-serif; font-weight: 800; }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .cropper-view-box, .cropper-face { border-radius: 4px; }
+        
+        /* スロー点滅アニメーション */
+        @keyframes slow-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .7; }
+        }
+        .animate-slow-pulse {
+            animation: slow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen relative">
+
+    <!-- フォントプリロード用 -->
+    <div style="visibility: hidden; position: absolute; width: 0; height: 0; overflow: hidden;">
+        <span class="line-seed-jp-regular">preload</span>
+        <span class="line-seed-jp-medium">preload</span>
+        <span class="line-seed-jp-bold">preload</span>
+        <span class="line-seed-jp-black">preload</span>
+    </div>
+
+    <!-- トースト通知 (ポップアップ) -->
+    <div id="toast-notification" class="fixed top-20 md:top-6 left-1/2 transform -translate-x-1/2 bg-slate-800/95 backdrop-blur-sm text-white px-6 py-3 rounded-xl shadow-2xl transition-all duration-300 z-[200] opacity-0 -translate-y-10 pointer-events-none flex items-center gap-2 font-bold border border-slate-700">
+        <span class="material-symbols-outlined text-green-400" id="toast-icon">check_circle</span>
+        <span id="toast-message" class="text-sm"></span>
+    </div>
+
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm sticky top-0 z-30" id="header-main">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex gap-2 w-full justify-between lg:w-auto">
+                <button id="btn-save-json" class="text-xs md:text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm border border-blue-100">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                    保存(JSON)
+                </button>
+                <label class="text-xs md:text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm border border-slate-200 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">upload</span>
+                    読込
+                    <input type="file" id="input-load-json" accept=".json" class="hidden">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 md:p-6 relative lg:flex lg:gap-8">
+        
+        <!-- ==========================================
+             左カラム：入力フォーム
+        ========================================== -->
+        <div id="left-col" class="w-full lg:w-1/2">
+            <div id="screen-input" class="space-y-8 pb-24 lg:pb-8">
+                
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">1. 立ち絵イラスト</h2>
+                    <div class="upload-area rounded-lg p-8 text-center cursor-pointer relative" id="image-drop-area" onclick="document.getElementById('input-image').click()">
+                        <input type="file" id="input-image" class="hidden" accept="image/*">
+                        
+                        <div id="image-preview-container" class="hidden flex-col items-center">
+                            <img id="image-thumbnail" src="" class="h-48 object-contain rounded-md shadow-sm mb-3">
+                            <span class="text-sm text-blue-700 font-bold">画像を変更する</span>
+                        </div>
+
+                        <div id="image-placeholder" class="text-slate-400">
+                            <span class="material-symbols-outlined text-5xl text-slate-300 mb-2">add_photo_alternate</span>
+                            <p class="font-medium">タップして画像を選択</p>
+                            <p class="text-xs mt-1">※縦長・背景透過の画像がおすすめです</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button id="btn-main-crop" class="hidden text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg shadow-sm border border-slate-200 mx-auto flex items-center justify-center gap-1 transition-colors">
+                            <span class="material-symbols-outlined text-[18px]">crop</span>
+                            トリミングを調整
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">2. 基本情報</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-bold text-slate-700 mb-1">キャラクター名</label>
+                            <input type="text" id="input-name" placeholder="◯◯◯" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" value="">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-bold text-slate-700 mb-1">ふりがな等</label>
+                            <input type="text" id="input-ruby" placeholder="◯◯◯" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" value="">
+                        </div>
+                        
+                        <div class="md:col-span-2 border-t pt-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-bold text-slate-700">ステータス</label>
+                            </div>
+                            <div id="status-container" class="space-y-2">
+                                <!-- JSで動的に追加される -->
+                            </div>
+                            <div class="mt-3">
+                                <button id="btn-add-status" class="text-sm text-blue-700 font-bold flex items-center gap-1 hover:text-blue-800 transition-colors bg-blue-50 px-3 py-1.5 rounded-md">
+                                    <span class="material-symbols-outlined text-[18px]">add</span>
+                                    項目を追加
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-end mb-4 border-b pb-2">
+                        <h2 class="text-lg font-bold">3. フリースペース</h2>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-400">見出し文字色:</span>
+                            <button type="button" id="btn-fc-white" class="w-5 h-5 rounded-full bg-white border border-slate-300 shadow-sm hover:scale-110 transition-transform" title="白"></button>
+                            <button type="button" id="btn-fc-black" class="w-5 h-5 rounded-full bg-black border border-slate-700 shadow-sm hover:scale-110 transition-transform" title="黒"></button>
+                            <input type="color" id="input-free-color" value="#FFFFFF" class="h-6 w-8 cursor-pointer border-0 p-0 rounded-sm shadow-sm" title="カスタムカラー">
+                        </div>
+                    </div>
+                    
+                    <div id="freespace-container" class="space-y-4">
+                        <!-- JSで動的に追加される -->
+                    </div>
+                    <div class="mt-4">
+                        <button id="btn-add-freespace" class="text-sm text-blue-700 font-bold flex items-center gap-1 hover:text-blue-800 transition-colors bg-blue-50 px-3 py-1.5 rounded-md">
+                            <span class="material-symbols-outlined text-[18px]">add</span>
+                            フリースペースを追加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2">4. デザイン設定</h2>
+                    <div class="space-y-3">
+                        <label class="block text-sm font-bold text-slate-700">テーマカラー</label>
+                        <div class="flex items-center flex-wrap gap-3">
+                            <div id="color-presets" class="flex flex-wrap gap-2 items-center border-r border-slate-200 pr-3">
+                            </div>
+                            
+                            <div class="flex items-center gap-2 pl-1">
+                                <span class="text-xs font-bold text-slate-400">カスタム:</span>
+                                <input type="color" id="input-color" value="#3B82F6" class="h-8 w-12 cursor-pointer border-0 p-0 rounded-md">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- スマホ用の固定フッター（プレビュー作成ボタン） -->
+            <div id="footer-input" class="fixed bottom-0 left-0 w-full bg-white border-t p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 lg:hidden">
+                <div class="max-w-3xl mx-auto">
+                    <button class="btn-generate w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 flex justify-center items-center gap-2">
+                        <span class="material-symbols-outlined">image</span>
+                        <span>プレビューを作成</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             右カラム：プレビュー画面 (PCでは常時表示)
+        ========================================== -->
+        <div id="right-col" class="w-full lg:w-1/2 hidden lg:flex flex-col items-center pb-24 lg:pb-8 lg:sticky lg:top-20 lg:h-[calc(100vh-100px)] lg:overflow-y-auto">
+            
+            <!-- PC用のプレビュー更新ボタン -->
+            <button class="btn-generate hidden lg:flex w-full max-w-[600px] mb-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 justify-center items-center gap-2">
+                <span class="material-symbols-outlined">refresh</span>
+                <span>プレビューを更新</span>
+            </button>
+
+            <canvas id="hidden-canvas" class="hidden"></canvas>
+            
+            <img id="preview-image" alt="Profile Card" class="w-full max-w-[600px] h-auto rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.1)] mx-auto block cursor-pointer bg-white" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+            
+            <p class="mt-4 text-sm text-slate-400 text-center font-bold">画像を長押し（または右クリック）で保存できます</p>
+
+            <!-- PC用の保存ボタン -->
+            <button class="btn-download hidden lg:flex w-full max-w-[600px] mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform active:scale-95 justify-center items-center gap-2">
+                <span class="material-symbols-outlined text-[20px]">download</span>
+                端末に保存する
+            </button>
+        </div>
+
+        <!-- スマホ用のプレビュー画面固定フッター -->
+        <div id="footer-preview" class="fixed bottom-0 left-0 w-full bg-white border-t p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 hidden lg:hidden">
+            <div class="max-w-3xl mx-auto flex gap-3">
+                <button id="btn-back" class="flex-none bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors flex items-center gap-1 border border-slate-200 shadow-sm">
+                    <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+                    入力に戻る
+                </button>
+                <button class="btn-download flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform active:scale-95 flex justify-center items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">download</span>
+                    端末に保存する
+                </button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             画面3：トリミング調整画面
+        ========================================== -->
+        <div id="screen-crop" class="hidden fixed inset-0 z-40 bg-slate-900 flex flex-col">
+            <div class="px-4 py-3 bg-slate-800 text-white shadow-md z-10 flex-none text-center">
+                <span class="font-bold">トリミングの調整</span>
+            </div>
+            <div class="flex-grow overflow-hidden flex items-center justify-center p-4 relative">
+                <img id="cropper-image" src="" class="max-w-full max-h-full block">
+            </div>
+            
+            <div class="flex-none bg-slate-800 border-t border-slate-700 pb-20">
+                <div id="crop-aspect-ratios" class="hidden p-4 pb-0 flex justify-center gap-3">
+                    <button class="btn-aspect bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors" data-type="square">正方形</button>
+                    
+                    <div class="relative" id="aspect-portrait-dropdown-container">
+                        <button class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors flex items-center gap-1" id="btn-aspect-portrait-dropdown">
+                            縦長 <span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+                        </button>
+                        <div class="absolute bottom-full left-0 mb-2 w-24 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden hidden" id="aspect-portrait-dropdown-menu">
+                            <button class="btn-aspect-dropdown-item w-full text-center px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 font-bold" data-type="portrait-3-4">3:4</button>
+                            <button class="btn-aspect-dropdown-item w-full text-center px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 font-bold" data-type="portrait-3-5">3:5</button>
+                            <button class="btn-aspect-dropdown-item w-full text-center px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 font-bold" data-type="portrait-9-16">9:16</button>
+                        </div>
+                    </div>
+
+                    <div class="relative" id="aspect-dropdown-container">
+                        <button class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow transition-colors flex items-center gap-1" id="btn-aspect-dropdown">
+                            横長 <span class="material-symbols-outlined text-[16px]">arrow_drop_down</span>
+                        </button>
+                        <div class="absolute bottom-full left-0 mb-2 w-24 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden hidden" id="aspect-dropdown-menu">
+                            <button class="btn-aspect-dropdown-item w-full text-center px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 font-bold" data-type="landscape-4-3">4:3</button>
+                            <button class="btn-aspect-dropdown-item w-full text-center px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 font-bold" data-type="landscape-5-3">5:3</button>
+                            <button class="btn-aspect-dropdown-item w-full text-center px-4 py-2 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-600 font-bold" data-type="landscape-16-9">16:9</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="crop-zoom-controls" class="p-4 pt-4 flex flex-col items-center gap-2 w-full relative">
+                    <div class="text-slate-300 text-xs font-bold mb-1 flex justify-between w-full max-w-sm px-2">
+                        <span>拡大・縮小 (<span id="zoom-value-display">100</span>%)</span>
+                        <button type="button" id="btn-zoom-fit" class="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors">
+                            <span class="material-symbols-outlined text-[14px]">fit_screen</span> フィット
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-4 w-full max-w-sm">
+                        <button type="button" id="btn-zoom-out" class="w-10 h-10 flex-none bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center transition-colors shadow">
+                            <span class="material-symbols-outlined text-[24px]">remove</span>
+                        </button>
+                        <input type="range" id="input-zoom-slider" min="0.5" max="1.5" step="0.01" value="1" class="w-full flex-grow accent-blue-600">
+                        <button type="button" id="btn-zoom-in" class="w-10 h-10 flex-none bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center transition-colors shadow">
+                            <span class="material-symbols-outlined text-[24px]">add</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="footer-crop" class="fixed bottom-0 left-0 w-full bg-slate-800 border-t border-slate-700 p-4 z-50 hidden">
+            <div class="max-w-3xl mx-auto flex justify-center">
+                <button id="btn-crop-confirm" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform active:scale-95 flex justify-center items-center gap-2">
+                    <span class="material-symbols-outlined">check</span>
+                    確定して戻る
+                </button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             モーダル：JSON保存確認
+        ========================================== -->
+        <div id="modal-json-save" class="fixed inset-0 z-[100] bg-black/60 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl transform transition-all">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="material-symbols-outlined text-blue-700 text-3xl">save</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">データを保存しますか？</h3>
+                    <p class="text-sm text-slate-400">画像データを含むため、ファイルサイズが大きくなる場合があります。</p>
+                </div>
+                
+                <div class="bg-slate-50 rounded-lg p-4 mb-6 border border-slate-100">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-bold text-slate-700">推定データサイズ</span>
+                        <span id="json-size-display" class="text-lg font-bold text-blue-700">-- MB</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="btn-json-cancel" class="flex-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 rounded-xl transition-colors">
+                        キャンセル
+                    </button>
+                    <button id="btn-json-proceed" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-colors flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-[18px]">download</span>
+                        保存する
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- トースト通知表示関数 ---
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast-notification');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            toastMsg.textContent = message;
+            
+            if (isError) {
+                toastIcon.textContent = 'error';
+                toastIcon.classList.remove('text-green-400');
+                toastIcon.classList.add('text-red-400');
+            } else {
+                toastIcon.textContent = 'check_circle';
+                toastIcon.classList.remove('text-red-400');
+                toastIcon.classList.add('text-green-400');
+            }
+            
+            toast.classList.remove('opacity-0', '-translate-y-10');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-10');
+            }, 3000);
+        }
+
+        // --- 状態管理 ---
+        let mainImageData = { original: null, cropped: null, cropData: null, canvasData: null, cropBoxData: null, initialZoom: null };
+        let mainImageObj = null; 
+        
+        let fsImages = {};     
+        let fsImageObjs = {};  
+
+        let cropper = null;
+        let currentCropTarget = null; 
+        let initialZoomRatio = 0; 
+        
+        let tempJsonDataStr = '';
+        let tempJsonFileName = '';
+        let isChanged = false;
+
+        // --- DOM要素 ---
+        const leftCol = document.getElementById('left-col');
+        const rightCol = document.getElementById('right-col');
+        const footerInput = document.getElementById('footer-input');
+        const footerPreview = document.getElementById('footer-preview');
+        const headerMain = document.getElementById('header-main');
+        const screenCrop = document.getElementById('screen-crop');
+        const footerCrop = document.getElementById('footer-crop');
+        
+        const btnsGenerate = document.querySelectorAll('.btn-generate');
+        const btnBack = document.getElementById('btn-back');
+        const btnsDownload = document.querySelectorAll('.btn-download');
+        
+        const canvas = document.getElementById('hidden-canvas');
+        const ctx = canvas.getContext('2d');
+        const previewImage = document.getElementById('preview-image');
+
+        const inputImage = document.getElementById('input-image');
+        const imagePlaceholder = document.getElementById('image-placeholder');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imageThumbnail = document.getElementById('image-thumbnail');
+        const btnMainCrop = document.getElementById('btn-main-crop');
+        
+        const statusContainer = document.getElementById('status-container');
+        const freespaceContainer = document.getElementById('freespace-container');
+        const inputFreeColor = document.getElementById('input-free-color');
+        const inputColor = document.getElementById('input-color');
+        const colorPresetsContainer = document.getElementById('color-presets');
+        
+        const btnAspectDropdown = document.getElementById('btn-aspect-dropdown');
+        const aspectDropdownMenu = document.getElementById('aspect-dropdown-menu');
+        const btnAspectPortraitDropdown = document.getElementById('btn-aspect-portrait-dropdown');
+        const aspectPortraitDropdownMenu = document.getElementById('aspect-portrait-dropdown-menu');
+
+        // --- 変更検知と点滅アニメーション ---
+        function markAsChanged() {
+            if (isChanged) return;
+            isChanged = true;
+            btnsGenerate.forEach(btn => {
+                btn.classList.remove('bg-slate-800', 'hover:bg-slate-700');
+                btn.classList.add('bg-amber-500', 'hover:bg-amber-600', 'animate-slow-pulse');
+            });
+        }
+
+        function resetChangeFlag() {
+            isChanged = false;
+            btnsGenerate.forEach(btn => {
+                btn.classList.remove('bg-amber-500', 'hover:bg-amber-600', 'animate-slow-pulse');
+                btn.classList.add('bg-slate-800', 'hover:bg-slate-700');
+            });
+        }
+
+        document.addEventListener('input', (e) => {
+            if (e.target.matches('input[type="text"], textarea, input[type="color"], input[type="file"]')) {
+                markAsChanged();
+            }
+        });
+        colorPresetsContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') markAsChanged();
+        });
+        document.getElementById('btn-add-status').addEventListener('click', markAsChanged);
+        document.getElementById('btn-add-freespace').addEventListener('click', markAsChanged);
+        document.getElementById('btn-fc-white').addEventListener('click', markAsChanged);
+        document.getElementById('btn-fc-black').addEventListener('click', markAsChanged);
+
+        // --- 共通画像ロード ---
+        function loadImageFromDataUrl(dataUrl, type, id = null) {
+            const img = new Image();
+            img.onload = function() {
+                if (type === 'main') {
+                    mainImageObj = img;
+                    imageThumbnail.src = dataUrl;
+                    imagePlaceholder.classList.add('hidden');
+                    imagePreviewContainer.classList.remove('hidden');
+                    imagePreviewContainer.classList.add('flex');
+                    btnMainCrop.classList.remove('hidden');
+                } else if (type === 'fs') {
+                    fsImageObjs[id] = img;
+                    const item = document.querySelector(`.freespace-item[data-id="${id}"]`);
+                    if (item) {
+                        const thumb = item.querySelector('.fs-thumbnail');
+                        thumb.src = dataUrl;
+                        thumb.classList.remove('hidden');
+                        item.querySelector('.fs-upload-label').textContent = '画像変更';
+                        item.querySelector('.btn-fs-crop').classList.remove('hidden');
+                        item.querySelector('.btn-fs-remove-img').classList.remove('hidden');
+                    }
+                }
+                markAsChanged();
+            }
+            img.src = dataUrl;
+        }
+
+        // --- 立ち絵アップロード ---
+        inputImage.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                mainImageData.original = event.target.result;
+                openCropScreen('main', event.target.result);
+                e.target.value = '';
+            }
+            reader.readAsDataURL(file);
+        });
+
+        btnMainCrop.addEventListener('click', () => {
+            if (mainImageData.original) openCropScreen('main', mainImageData.original);
+        });
+
+        // --- トリミング（Cropper）制御 ---
+        btnAspectDropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            aspectDropdownMenu.classList.toggle('hidden');
+            aspectPortraitDropdownMenu.classList.add('hidden');
+        });
+
+        btnAspectPortraitDropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            aspectPortraitDropdownMenu.classList.toggle('hidden');
+            aspectDropdownMenu.classList.add('hidden');
+        });
+
+        document.addEventListener('click', () => {
+            if (!aspectDropdownMenu.classList.contains('hidden')) {
+                aspectDropdownMenu.classList.add('hidden');
+            }
+            if (!aspectPortraitDropdownMenu.classList.contains('hidden')) {
+                aspectPortraitDropdownMenu.classList.add('hidden');
+            }
+        });
+
+        function openCropScreen(targetId, imageUrl, aspectType = 'square') {
+            currentCropTarget = targetId;
+            const cropImg = document.getElementById('cropper-image');
+            
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            cropImg.src = imageUrl;
+            
+            // PC・スマホ共通で一時的に全画面覆う
+            leftCol.classList.add('hidden');
+            rightCol.classList.add('hidden');
+            footerInput.classList.add('hidden');
+            footerPreview.classList.add('hidden');
+            headerMain.classList.add('hidden');
+            
+            screenCrop.classList.remove('hidden');
+            footerCrop.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+
+            let aspectRatio = NaN;
+            const aspectContainer = document.getElementById('crop-aspect-ratios');
+            const aspectBtns = document.querySelectorAll('.btn-aspect');
+            
+            if (targetId === 'main') {
+                aspectRatio = 350 / 1100;
+                aspectContainer.classList.add('hidden');
+            } else {
+                aspectContainer.classList.remove('hidden');
+                
+                aspectBtns.forEach(b => {
+                    b.classList.remove('bg-blue-600', 'text-white');
+                    b.classList.add('bg-slate-700', 'text-white');
+                    if(b.dataset.type === aspectType) {
+                        b.classList.remove('bg-slate-700');
+                        b.classList.add('bg-blue-600');
+                    }
+                });
+                
+                btnAspectDropdown.classList.remove('bg-blue-600');
+                btnAspectDropdown.classList.add('bg-slate-700');
+                btnAspectPortraitDropdown.classList.remove('bg-blue-600');
+                btnAspectPortraitDropdown.classList.add('bg-slate-700');
+                
+                if (aspectType && aspectType.startsWith('landscape')) {
+                    btnAspectDropdown.classList.remove('bg-slate-700');
+                    btnAspectDropdown.classList.add('bg-blue-600');
+                }
+                
+                if (aspectType && aspectType.startsWith('portrait')) {
+                    btnAspectPortraitDropdown.classList.remove('bg-slate-700');
+                    btnAspectPortraitDropdown.classList.add('bg-blue-600');
+                }
+                
+                if (aspectType === 'square') aspectRatio = 1;
+                else if (aspectType === 'portrait-3-4' || aspectType === 'portrait') aspectRatio = 3 / 4;
+                else if (aspectType === 'portrait-3-5') aspectRatio = 3 / 5;
+                else if (aspectType === 'portrait-9-16') aspectRatio = 9 / 16;
+                else if (aspectType === 'landscape-4-3') aspectRatio = 4 / 3;
+                else if (aspectType === 'landscape-5-3') aspectRatio = 5 / 3;
+                else if (aspectType === 'landscape-16-9') aspectRatio = 16 / 9;
+            }
+
+            cropImg.onload = () => {
+                cropper = new Cropper(cropImg, {
+                    aspectRatio: aspectRatio,
+                    viewMode: 0, 
+                    background: false,
+                    autoCropArea: 1,
+                    dragMode: 'move',
+                    zoomOnTouch: true, 
+                    zoomOnWheel: true, 
+                    ready() {
+                        const targetData = currentCropTarget === 'main' ? mainImageData : fsImages[currentCropTarget];
+                        
+                        if (!targetData.initialZoom) {
+                            targetData.initialZoom = cropper.getImageData().width / cropper.getImageData().naturalWidth;
+                        }
+                        initialZoomRatio = targetData.initialZoom;
+
+                        if (targetData.canvasData) cropper.setCanvasData(targetData.canvasData);
+                        if (targetData.cropBoxData) cropper.setCropBoxData(targetData.cropBoxData);
+                        if (targetData.cropData) cropper.setData(targetData.cropData);
+                        
+                        const currentScale = (cropper.getImageData().width / cropper.getImageData().naturalWidth) / initialZoomRatio;
+                        document.getElementById('input-zoom-slider').value = currentScale;
+                        document.getElementById('zoom-value-display').textContent = Math.round(currentScale * 100);
+                    },
+                    zoom(event) {
+                        if (!initialZoomRatio) return;
+                        let newScale = event.detail.ratio / initialZoomRatio;
+                        
+                        if (newScale < 0.5 || newScale > 1.5) {
+                            event.preventDefault(); 
+                            return;
+                        }
+                        
+                        document.getElementById('input-zoom-slider').value = newScale;
+                        document.getElementById('zoom-value-display').textContent = Math.round(newScale * 100);
+                    }
+                });
+            };
+        }
+
+        // --- ズームコントロールのイベント ---
+        function updateZoom(val) {
+            if(!cropper || !initialZoomRatio) return;
+            if (val < 0.5) val = 0.5;
+            if (val > 1.5) val = 1.5;
+            document.getElementById('input-zoom-slider').value = val;
+            document.getElementById('zoom-value-display').textContent = Math.round(val * 100);
+            cropper.zoomTo(initialZoomRatio * val);
+        }
+
+        document.getElementById('btn-zoom-fit').addEventListener('click', () => {
+            if(!cropper) return;
+            // Cropperをリセットして初期表示（枠にフィットした状態）に戻す
+            cropper.reset();
+            document.getElementById('input-zoom-slider').value = 1;
+            document.getElementById('zoom-value-display').textContent = '100';
+        });
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => {
+            const slider = document.getElementById('input-zoom-slider');
+            updateZoom(parseFloat(slider.value) + 0.01);
+        });
+        
+        document.getElementById('btn-zoom-out').addEventListener('click', () => {
+            const slider = document.getElementById('input-zoom-slider');
+            updateZoom(parseFloat(slider.value) - 0.01);
+        });
+        
+        document.getElementById('input-zoom-slider').addEventListener('input', (e) => {
+            updateZoom(parseFloat(e.target.value));
+        });
+
+        document.querySelectorAll('.btn-aspect, .btn-aspect-dropdown-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const type = e.currentTarget.dataset.type;
+                fsImages[currentCropTarget].aspectType = type;
+                
+                document.querySelectorAll('.btn-aspect').forEach(b => {
+                    b.classList.remove('bg-blue-600');
+                    b.classList.add('bg-slate-700');
+                });
+                
+                btnAspectDropdown.classList.remove('bg-blue-600');
+                btnAspectDropdown.classList.add('bg-slate-700');
+                btnAspectPortraitDropdown.classList.remove('bg-blue-600');
+                btnAspectPortraitDropdown.classList.add('bg-slate-700');
+
+                if (e.currentTarget.classList.contains('btn-aspect')) {
+                    e.currentTarget.classList.remove('bg-slate-700');
+                    e.currentTarget.classList.add('bg-blue-600');
+                }
+                
+                if (type && type.startsWith('landscape')) {
+                    btnAspectDropdown.classList.remove('bg-slate-700');
+                    btnAspectDropdown.classList.add('bg-blue-600');
+                }
+                
+                if (type && type.startsWith('portrait')) {
+                    btnAspectPortraitDropdown.classList.remove('bg-slate-700');
+                    btnAspectPortraitDropdown.classList.add('bg-blue-600');
+                }
+
+                if (type === 'square') cropper.setAspectRatio(1);
+                else if (type === 'portrait-3-4' || type === 'portrait') cropper.setAspectRatio(3/4);
+                else if (type === 'portrait-3-5') cropper.setAspectRatio(3/5);
+                else if (type === 'portrait-9-16') cropper.setAspectRatio(9/16);
+                else if (type === 'landscape-4-3') cropper.setAspectRatio(4/3);
+                else if (type === 'landscape-5-3') cropper.setAspectRatio(5/3);
+                else if (type === 'landscape-16-9') cropper.setAspectRatio(16/9);
+            });
+        });
+
+        document.getElementById('btn-crop-confirm').addEventListener('click', () => {
+            if (!cropper) return;
+            const croppedCanvas = cropper.getCroppedCanvas();
+            if (!croppedCanvas) return;
+            
+            const dataUrl = croppedCanvas.toDataURL('image/png');
+            const cropData = cropper.getData();
+            const canvasData = cropper.getCanvasData();
+            const cropBoxData = cropper.getCropBoxData();
+            
+            if (currentCropTarget === 'main') {
+                mainImageData.cropped = dataUrl;
+                mainImageData.cropData = cropData;
+                mainImageData.canvasData = canvasData;
+                mainImageData.cropBoxData = cropBoxData;
+                loadImageFromDataUrl(dataUrl, 'main');
+            } else {
+                fsImages[currentCropTarget].cropped = dataUrl;
+                fsImages[currentCropTarget].cropData = cropData;
+                fsImages[currentCropTarget].canvasData = canvasData;
+                fsImages[currentCropTarget].cropBoxData = cropBoxData;
+                loadImageFromDataUrl(dataUrl, 'fs', currentCropTarget);
+            }
+
+            // 元の画面に戻す
+            screenCrop.classList.add('hidden');
+            footerCrop.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            headerMain.classList.remove('hidden');
+            
+            if (window.innerWidth >= 1024) { // PC
+                leftCol.classList.remove('hidden');
+                rightCol.classList.remove('hidden');
+                rightCol.classList.add('flex');
+            } else { // スマホ (入力画面に戻る)
+                leftCol.classList.remove('hidden');
+                footerInput.classList.remove('hidden');
+            }
+            
+            markAsChanged();
+        });
+
+
+        // --- JSONの保存（エクスポート）とモーダル制御 ---
+        function buildJsonData() {
+            const stats = [];
+            document.querySelectorAll('.status-row').forEach(row => {
+                const l = row.querySelector('.status-label').value;
+                const v = row.querySelector('.status-value').value;
+                stats.push({ l, v });
+            });
+
+            const freeSpaces = [];
+            document.querySelectorAll('.freespace-item').forEach(item => {
+                const id = item.dataset.id;
+                freeSpaces.push({
+                    id: id,
+                    title: item.querySelector('.freespace-title').value,
+                    content: item.querySelector('.freespace-content').value,
+                    image: fsImages[id] || null
+                });
+            });
+
+            return {
+                name: document.getElementById('input-name').value,
+                ruby: document.getElementById('input-ruby').value,
+                themeColor: document.getElementById('input-color').value,
+                freeTextColor: document.getElementById('input-free-color').value,
+                stats: stats,
+                freeSpaces: freeSpaces,
+                mainImage: mainImageData
+            };
+        }
+
+        document.getElementById('btn-save-json').addEventListener('click', () => {
+            const data = buildJsonData();
+            const jsonStr = JSON.stringify(data);
+            const byteSize = new Blob([jsonStr]).size;
+            const mbSize = (byteSize / (1024 * 1024)).toFixed(2);
+
+            document.getElementById('json-size-display').textContent = `${mbSize} MB`;
+            document.getElementById('modal-json-save').classList.remove('hidden');
+            document.getElementById('modal-json-save').classList.add('flex');
+            
+            tempJsonDataStr = jsonStr;
+            tempJsonFileName = data.name || 'Character';
+        });
+
+        document.getElementById('btn-json-proceed').addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(tempJsonDataStr);
+            const link = document.createElement('a');
+            link.href = dataStr;
+            link.download = `ProfileData_${tempJsonFileName}.json`;
+            link.click();
+            
+            document.getElementById('modal-json-save').classList.add('hidden');
+            document.getElementById('modal-json-save').classList.remove('flex');
+        });
+
+        document.getElementById('btn-json-cancel').addEventListener('click', () => {
+            document.getElementById('modal-json-save').classList.add('hidden');
+            document.getElementById('modal-json-save').classList.remove('flex');
+        });
+
+        // --- JSONの読込（インポート） ---
+        document.getElementById('input-load-json').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = JSON.parse(event.target.result);
+                    
+                    if (data.name !== undefined) document.getElementById('input-name').value = data.name;
+                    if (data.ruby !== undefined) document.getElementById('input-ruby').value = data.ruby;
+                    if (data.themeColor !== undefined) document.getElementById('input-color').value = data.themeColor;
+                    if (data.freeTextColor !== undefined) document.getElementById('input-free-color').value = data.freeTextColor;
+                    
+                    if (data.stats && Array.isArray(data.stats)) {
+                        statusContainer.innerHTML = '';
+                        data.stats.forEach(stat => {
+                            createStatusRow(stat.l, stat.v);
+                        });
+                    }
+
+                    if (data.mainImage) {
+                        mainImageData = data.mainImage;
+                        if (mainImageData.cropped) loadImageFromDataUrl(mainImageData.cropped, 'main');
+                    }
+
+                    if (data.freeSpaces && Array.isArray(data.freeSpaces)) {
+                        freespaceContainer.innerHTML = '';
+                        fsImages = {};
+                        fsImageObjs = {};
+                        data.freeSpaces.forEach(fs => {
+                            const id = createFreespaceRow(fs.title, fs.content, fs.id);
+                            if (fs.image && fs.image.cropped) {
+                                // 以前のJSONとの互換性を確保
+                                let aType = fs.image.aspectType;
+                                if (aType === 'portrait') aType = 'portrait-3-4';
+                                
+                                fsImages[id] = fs.image;
+                                fsImages[id].aspectType = aType;
+                                loadImageFromDataUrl(fs.image.cropped, 'fs', id);
+                            }
+                        });
+                    }
+                    
+                    e.target.value = ''; 
+                    markAsChanged();
+                    showToast('データを読み込みました！');
+                } catch (err) {
+                    console.error(err);
+                    showToast('データの読み込みに失敗しました。', true);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // --- ステータス行の動的生成 ---
+        function createStatusRow(defaultLabel = '', defaultValue = '') {
+            const row = document.createElement('div');
+            row.className = 'flex gap-2 items-center status-row';
+            row.innerHTML = `
+                <input type="text" placeholder="項目名" value="${defaultLabel}" class="status-label w-1/3 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" placeholder="◯◯◯" value="${defaultValue}" class="status-value w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="button" class="btn-remove-status text-slate-300 hover:text-red-500 transition-colors p-1" title="削除">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            `;
+            row.querySelector('.btn-remove-status').addEventListener('click', () => {
+                row.remove();
+                markAsChanged();
+            });
+            statusContainer.appendChild(row);
+        }
+
+        createStatusRow('年齢・職業', '');
+        createStatusRow('身長', '');
+        createStatusRow('スリーサイズ', '');
+
+        document.getElementById('btn-add-status').addEventListener('click', () => {
+            createStatusRow('', '');
+        });
+
+        // --- フリースペースの色設定 ---
+        document.getElementById('btn-fc-white').addEventListener('click', () => inputFreeColor.value = '#FFFFFF');
+        document.getElementById('btn-fc-black').addEventListener('click', () => inputFreeColor.value = '#333333');
+
+        // --- フリースペースの動的生成 ---
+        function updateFreespaceButtons() {
+            const items = freespaceContainer.querySelectorAll('.freespace-item');
+            
+            items.forEach((item, index) => {
+                const btnRemove = item.querySelector('.btn-remove-fs');
+                const btnUp = item.querySelector('.btn-up-fs');
+                const btnDown = item.querySelector('.btn-down-fs');
+                
+                if (btnRemove) btnRemove.style.display = items.length <= 1 ? 'none' : 'block';
+                if (btnUp) btnUp.style.display = index === 0 ? 'none' : 'block';
+                if (btnDown) btnDown.style.display = index === items.length - 1 ? 'none' : 'block';
+            });
+        }
+
+        function createFreespaceRow(defaultTitle = '', defaultContent = '', forceId = null) {
+            const id = forceId || Date.now().toString() + Math.random().toString(36).substr(2, 5);
+            if (!fsImages[id]) {
+                fsImages[id] = { original: null, cropped: null, cropData: null, canvasData: null, cropBoxData: null, initialZoom: null, aspectType: 'square' };
+            }
+
+            const row = document.createElement('div');
+            row.className = 'freespace-item border border-slate-200 rounded-xl p-3 bg-slate-50 relative mt-4 md:pr-4 flex gap-3';
+            row.dataset.id = id;
+            row.innerHTML = `
+                <div class="absolute -top-4 right-0 flex bg-white rounded-full shadow-md border border-slate-200 overflow-hidden">
+                    <button type="button" class="btn-up-fs text-slate-400 hover:bg-slate-50 hover:text-blue-500 transition-colors px-1 py-0.5" title="上へ">
+                        <span class="material-symbols-outlined text-[20px] block">arrow_upward</span>
+                    </button>
+                    <button type="button" class="btn-down-fs text-slate-400 hover:bg-slate-50 hover:text-blue-500 transition-colors border-l border-slate-100 px-1 py-0.5" title="下へ">
+                        <span class="material-symbols-outlined text-[20px] block">arrow_downward</span>
+                    </button>
+                    <button type="button" class="btn-remove-fs text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors border-l border-slate-100 px-1 py-0.5" title="削除">
+                        <span class="material-symbols-outlined text-[20px] block">close</span>
+                    </button>
+                </div>
+                
+                <div class="flex-1 flex flex-col pt-1">
+                    <input type="text" placeholder="見出し (例: 詳細設定)" value="${defaultTitle}" class="freespace-title w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-sm font-bold mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <textarea rows="3" placeholder="内容を自由に記入してください。" class="freespace-content w-full flex-grow bg-white border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed resize-none">${defaultContent}</textarea>
+                </div>
+                
+                <div class="w-24 flex-none flex flex-col items-center justify-center border-l border-slate-200 pl-3 pt-1">
+                    <label class="cursor-pointer text-xs font-bold text-slate-400 hover:text-blue-700 flex flex-col items-center gap-1 transition-colors text-center">
+                        <span class="material-symbols-outlined text-[24px]">add_photo_alternate</span>
+                        <span class="fs-upload-label">画像追加</span>
+                        <input type="file" class="hidden input-fs-image" accept="image/*">
+                    </label>
+                    <img class="fs-thumbnail hidden w-full h-[72px] object-cover rounded shadow-sm mt-2 cursor-pointer border border-slate-200" title="トリミングを調整">
+                    <div class="flex flex-col items-center w-full mt-1 gap-1">
+                        <button type="button" class="btn-fs-crop hidden text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 w-full">調整</button>
+                        <button type="button" class="btn-fs-remove-img hidden text-[10px] text-red-500 hover:underline">削除</button>
+                    </div>
+                </div>
+            `;
+            
+            row.querySelector('.btn-up-fs').addEventListener('click', () => {
+                const prev = row.previousElementSibling;
+                if (prev) {
+                    freespaceContainer.insertBefore(row, prev);
+                    updateFreespaceButtons();
+                    markAsChanged();
+                }
+            });
+
+            row.querySelector('.btn-down-fs').addEventListener('click', () => {
+                const next = row.nextElementSibling;
+                if (next) {
+                    freespaceContainer.insertBefore(next, row);
+                    updateFreespaceButtons();
+                    markAsChanged();
+                }
+            });
+
+            row.querySelector('.btn-remove-fs').addEventListener('click', () => {
+                delete fsImages[id];
+                delete fsImageObjs[id];
+                row.remove();
+                updateFreespaceButtons();
+                markAsChanged();
+            });
+
+            row.querySelector('.input-fs-image').addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    fsImages[id].original = event.target.result;
+                    fsImages[id].aspectType = 'square';
+                    openCropScreen(id, event.target.result, 'square');
+                };
+                reader.readAsDataURL(file);
+                e.target.value = '';
+            });
+
+            const triggerCrop = () => {
+                if (fsImages[id] && fsImages[id].original) openCropScreen(id, fsImages[id].original, fsImages[id].aspectType);
+            };
+            row.querySelector('.fs-thumbnail').addEventListener('click', triggerCrop);
+            row.querySelector('.btn-fs-crop').addEventListener('click', triggerCrop);
+
+            row.querySelector('.btn-fs-remove-img').addEventListener('click', () => {
+                fsImages[id] = { original: null, cropped: null, cropData: null, canvasData: null, cropBoxData: null, initialZoom: null, aspectType: 'square' };
+                delete fsImageObjs[id];
+                row.querySelector('.fs-thumbnail').classList.add('hidden');
+                row.querySelector('.fs-thumbnail').src = '';
+                row.querySelector('.btn-fs-crop').classList.add('hidden');
+                row.querySelector('.btn-fs-remove-img').classList.add('hidden');
+                row.querySelector('.fs-upload-label').textContent = '画像追加';
+                markAsChanged();
+            });
+
+            freespaceContainer.appendChild(row);
+            updateFreespaceButtons();
+            return id;
+        }
+
+        // 初期フリースペースの追加
+        createFreespaceRow('', '');
+
+        document.getElementById('btn-add-freespace').addEventListener('click', () => {
+            createFreespaceRow('', '');
+            markAsChanged();
+        });
+
+        // --- カラープリセット ---
+        const colors = [
+            { name: '赤', hex: '#EF4444' },
+            { name: 'オレンジ', hex: '#F97316' },
+            { name: '黄色', hex: '#EAB308' },
+            { name: 'エメラルド', hex: '#10B981' },
+            { name: '水色', hex: '#06B6D4' },
+            { name: '青色', hex: '#3B82F6' },
+            { name: '紺色', hex: '#1E3A8A' },
+            { name: '紫色', hex: '#DF30BF' },
+            { name: 'ピンク', hex: '#EC4899' },
+            { name: '茶色', hex: '#8B4513' },
+        ];
+
+        colors.forEach(c => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'w-7 h-7 rounded-full shadow-sm hover:scale-110 transition-transform focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-slate-400';
+            btn.style.backgroundColor = c.hex;
+            btn.title = c.name;
+            btn.addEventListener('click', () => inputColor.value = c.hex);
+            colorPresetsContainer.appendChild(btn);
+        });
+
+        // --- 画面遷移（作成・更新） ---
+        btnsGenerate.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!mainImageData.cropped || !mainImageObj) {
+                    alert("立ち絵イラストを選択してください。");
+                    return;
+                }
+                drawCanvas();
+                previewImage.src = canvas.toDataURL('image/jpeg', 0.95);
+                resetChangeFlag();
+                
+                // スマホの場合のみ画面切り替え
+                if (window.innerWidth < 1024) {
+                    window.scrollTo(0, 0);
+                    headerMain.classList.add('hidden');
+                    leftCol.classList.add('hidden');
+                    footerInput.classList.add('hidden');
+                    
+                    rightCol.classList.remove('hidden');
+                    rightCol.classList.add('flex');
+                    footerPreview.classList.remove('hidden');
+                }
+            });
+        });
+
+        // スマホ用戻るボタン
+        btnBack.addEventListener('click', () => {
+            if (window.innerWidth < 1024) {
+                window.scrollTo(0, 0);
+                rightCol.classList.add('hidden');
+                rightCol.classList.remove('flex');
+                footerPreview.classList.add('hidden');
+                
+                headerMain.classList.remove('hidden');
+                leftCol.classList.remove('hidden');
+                footerInput.classList.remove('hidden');
+            }
+        });
+
+        // 保存ボタン
+        btnsDownload.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const nameVal = document.getElementById('input-name').value || 'Character';
+                const link = document.createElement('a');
+                link.download = `ProfileCard_${nameVal}.jpg`;
+                link.href = previewImage.src;
+                link.click();
+            });
+        });
+
+        // ==========================================
+        // Canvas描画
+        // ==========================================
+        function drawCanvas() {
+            const width = 2048;
+            const height = 2048;
+            canvas.width = width;
+            canvas.height = height;
+
+            const name = document.getElementById('input-name').value;
+            const ruby = document.getElementById('input-ruby').value;
+            const themeColor = document.getElementById('input-color').value;
+            const freeTextColor = document.getElementById('input-free-color').value;
+            
+            const stats = [];
+            document.querySelectorAll('.status-row').forEach(row => {
+                const l = row.querySelector('.status-label').value;
+                const v = row.querySelector('.status-value').value;
+                if(l || v) stats.push({ l, v });
+            });
+
+            const freeSpaces = [];
+            document.querySelectorAll('.freespace-item').forEach(item => {
+                const id = item.dataset.id;
+                const t = item.querySelector('.freespace-title').value;
+                const c = item.querySelector('.freespace-content').value;
+                if(t || c || (fsImages[id] && fsImages[id].cropped)) {
+                    freeSpaces.push({ id, title: t, content: c });
+                }
+            });
+
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, width, height);
+
+            const fontFamily = '"LINE Seed JP", sans-serif';
+
+            // --- 左側：画像エリア ---
+            const imgX = 85;
+            const imgY = 85;
+            const imgW = 594;
+            const imgH = 1878;
+            const radius = 41;
+
+            ctx.save();
+            roundRect(ctx, imgX, imgY, imgW, imgH, radius);
+            ctx.clip();
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(imgX, imgY, imgW, imgH);
+            
+            if (mainImageObj) {
+                ctx.drawImage(mainImageObj, imgX, imgY, imgW, imgH);
+            }
+            ctx.restore();
+
+            // --- 右側：情報エリア ---
+            const rightX = 768;
+            const rightW = 1195;
+            let currentY = 191;
+            
+            // 名前の描画 (先)
+            let nameWidth = 0;
+            if (name) {
+                ctx.fillStyle = "#000000"; 
+                ctx.font = `800 109px ${fontFamily}`;
+                ctx.fillText(name, rightX, currentY);
+                nameWidth = ctx.measureText(name).width;
+            }
+            
+            // ふりがな等の描画 (名前の右隣に付随)
+            if (ruby) {
+                const rubyX = name ? rightX + nameWidth + 35 : rightX;
+                ctx.fillStyle = "#94A3B8"; 
+                ctx.font = `700 55px ${fontFamily}`;
+                ctx.fillText(ruby, rubyX, currentY);
+            }
+
+            // 名前直下の罫線
+            currentY += 55;
+            
+            ctx.beginPath();
+            ctx.moveTo(rightX, currentY);
+            ctx.lineTo(rightX + rightW, currentY);
+            ctx.strokeStyle = themeColor;
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            // ステータス
+            currentY += 80;
+            stats.forEach(stat => {
+                ctx.fillStyle = themeColor;
+                ctx.font = `700 38px ${fontFamily}`;
+                ctx.fillText(stat.l, rightX, currentY);
+                
+                ctx.fillStyle = "#333333";
+                ctx.font = `400 38px ${fontFamily}`;
+                ctx.fillText(stat.v, rightX + 264, currentY);
+                
+                currentY += 70;
+            });
+
+            // --- フリースペースの描画 ---
+            currentY += 0; 
+            
+            if (freeSpaces.length > 0) {
+                const gap = 40;
+                const headerH = 90;
+
+                freeSpaces.forEach((fs) => {
+                    const itemY = currentY;
+
+                    // 高さを動的に計算
+                    let imgH = 0;
+                    let drawImgW = 0;
+                    if (fs.id && fsImageObjs[fs.id]) {
+                        const imgObj = fsImageObjs[fs.id];
+                        const aspect = imgObj.width / imgObj.height;
+                        const maxImgW = rightW * 0.25;
+                        drawImgW = maxImgW;
+                        imgH = drawImgW / aspect;
+                    }
+
+                    let textH = 0;
+                    let lines = [];
+                    if (fs.content) {
+                        ctx.font = `400 34px ${fontFamily}`;
+                        // 左右のパディングを正確に計算する
+                        const leftPadding = 34;
+                        const rightPadding = drawImgW > 0 ? (drawImgW + 40) : 34;
+                        const textMaxW = rightW - leftPadding - rightPadding;
+                        lines = getWrappedLines(ctx, fs.content, textMaxW);
+                        textH = lines.length * 48;
+                    }
+
+                    const reqImgH = imgH > 0 ? imgH + 49 : 0; 
+                    const reqTextH = textH > 0 ? textH + 47 : 34; 
+                    const contentH = Math.max(reqImgH, reqTextH);
+                    const itemH = headerH + contentH;
+
+                    // 背景白と角丸クリップ
+                    ctx.save();
+                    roundRect(ctx, rightX, itemY, rightW, itemH, 27);
+                    ctx.clip();
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fill();
+
+                    // 上部の見出し帯
+                    ctx.fillStyle = themeColor;
+                    ctx.fillRect(rightX, itemY, rightW, headerH);
+
+                    // 見出しテキスト
+                    if (fs.title) {
+                        ctx.fillStyle = freeTextColor;
+                        ctx.font = `800 43px ${fontFamily}`;
+                        ctx.fillText(fs.title, rightX + 34, itemY + 63);
+                    }
+                    ctx.restore(); 
+
+                    // 枠線
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = themeColor;
+                    roundRect(ctx, rightX, itemY, rightW, itemH, 27);
+                    ctx.stroke();
+
+                    // カスタム画像配置 (上寄り)
+                    if (drawImgW > 0) {
+                        const drawImgX = rightX + rightW - drawImgW - 28;
+                        const drawImgY = itemY + headerH + 28; 
+                        ctx.drawImage(fsImageObjs[fs.id], drawImgX, drawImgY, drawImgW, imgH);
+                    }
+
+                    // 本文テキスト
+                    if (fs.content) {
+                        ctx.fillStyle = "#333333";
+                        ctx.font = `400 34px ${fontFamily}`;
+                        let textY = itemY + headerH + 48;
+                        lines.forEach(line => {
+                            ctx.fillText(line, rightX + 34, textY + 10);
+                            textY += 48;
+                        });
+                    }
+                    
+                    currentY += itemH + gap;
+                });
+            }
+        }
+
+        // --- 補助関数 ---
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function getWrappedLines(ctx, text, maxWidth) {
+            const paragraphs = text.split('\n');
+            const lines = [];
+            for (let i = 0; i < paragraphs.length; i++) {
+                let words = paragraphs[i].split('');
+                let line = '';
+                for (let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n];
+                    let metrics = ctx.measureText(testLine);
+                    let testWidth = metrics.width;
+                    if (testWidth > maxWidth && n > 0) {
+                        lines.push(line);
+                        line = words[n];
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line);
+            }
+            return lines;
+        }
+    </script>
+</body>
+</html>
